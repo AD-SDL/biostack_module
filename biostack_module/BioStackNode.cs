@@ -77,8 +77,17 @@ namespace biostack_module
             Console.WriteLine(bTIAutoStacker.TestCommunicationWithoutDialog());
             PrintResponse(bTIAutoStacker.IdentifyConfiguredInstrument(8));
             PrintSystemStatus();
+
+            // Test Actions
             state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.HomeAllAxes());
+            Console.Write("Get Known Plate Positions: ");
+            byte plateByte = 0;
+            bTIAutoStacker.GetKnownPlatePositions(ref plateByte);
+            Console.WriteLine(plateByte);
+
+            PrintResponse(bTIAutoStacker.SendPlateToInstrument());
+
+            //PrintResponse(bTIAutoStacker.HomeAllAxes());
             while (state == ModuleStatus.BUSY)
             {
                 Thread.Sleep(1000);
@@ -89,8 +98,13 @@ namespace biostack_module
         {
             Console.WriteLine("---------------");
             Console.WriteLine("ACTION COMPLETE");
+            Console.Write("Message Object: ");
             PrintResponse(nMessageObject);
+            Console.Write("Return Code: ");
             PrintResponse(nReturnCode);
+            byte plateByte = 0;
+            bTIAutoStacker.GetKnownPlatePositions(ref plateByte);
+            Console.WriteLine(plateByte);
             Console.WriteLine("---------------");
             state = ModuleStatus.IDLE;
         }
