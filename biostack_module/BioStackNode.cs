@@ -16,7 +16,7 @@ namespace biostack_module
         public int Port { get; } = 2000;
 
         [Option(Description = "Whether or not to simulate the instrument")]
-        public bool Simulate { get; } = true;
+        public bool Simulate { get; } = false;
 
         public string state = ModuleStatus.INIT;
         private IRestServer server;
@@ -75,23 +75,174 @@ namespace biostack_module
             bTIAutoStacker.ActionIsCompleted += StackerActionCompleteHandler;
             Console.Write("Communications Test (1 means OK): ");
             Console.WriteLine(bTIAutoStacker.TestCommunicationWithoutDialog());
-            PrintResponse(bTIAutoStacker.IdentifyConfiguredInstrument(8));
+            PrintResponse(bTIAutoStacker.IdentifyConfiguredInstrument(0));
             PrintSystemStatus();
 
             // Test Actions
             state = ModuleStatus.BUSY;
-            Console.Write("Get Known Plate Positions: ");
-            byte plateByte = 0;
-            bTIAutoStacker.GetKnownPlatePositions(ref plateByte);
-            Console.WriteLine(plateByte);
+            //Console.Write("Get Known Plate Positions: ");
+            //byte plateByte = 0;
+            //bTIAutoStacker.GetKnownPlatePositions(ref plateByte);
+            //Console.WriteLine(plateByte);
 
-            PrintResponse(bTIAutoStacker.SendPlateToInstrument());
+            bTIAutoStacker.BTIAutoCalibrationSupport();
 
-            //PrintResponse(bTIAutoStacker.HomeAllAxes());
+            PrintResponse(bTIAutoStacker.HomeAllAxes());
             while (state == ModuleStatus.BUSY)
             {
                 Thread.Sleep(1000);
             }
+
+            PrintResponse(bTIAutoStacker.ClearPlateIDBarcode());
+            Console.WriteLine(bTIAutoStacker.GetLatestBarcodeValue());
+
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.SendNextPlateToCarrier());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.SendPlateToInstrument());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+            Thread.Sleep(5000);
+            Console.WriteLine(bTIAutoStacker.GetLatestBarcodeValue());
+   
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.TransferPlateToOutStack());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.SendPlateToInstrument());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+            Thread.Sleep(5000);
+            Console.WriteLine(bTIAutoStacker.GetLatestBarcodeValue());
+
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.TransferPlateToOutStack());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.SendPlateToInstrument());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+            Thread.Sleep(5000);
+            Console.WriteLine(bTIAutoStacker.GetLatestBarcodeValue());
+
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.TransferPlateToOutStack());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.FastTransferPlateFromOutToIn());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.FastTransferPlateFromOutToIn());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+
+            state = ModuleStatus.BUSY;
+            PrintResponse(bTIAutoStacker.FastTransferPlateFromOutToIn());
+            while (state == ModuleStatus.BUSY)
+            {
+                Thread.Sleep(1000);
+            }
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.SendPlateToInstrument());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.PresentPlateOnCarrier());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.TransferPlateToOutStack());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
+
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.SendNextDestPlateToCarrier());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
+
+
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.PlateToInputStackFromExtend());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.PlateFromInstrumentToClaw());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.PlateFromClawToInstrument());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
+
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.PresentPlateOnCarrier());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
+
+            //state = ModuleStatus.BUSY;
+            //PrintResponse(bTIAutoStacker.TransferPlateFromInstrToExtend());
+            //while (state == ModuleStatus.BUSY)
+            //{
+            //    Thread.Sleep(1000);
+            //}
         }
 
         private void StackerActionCompleteHandler(short nMessageObject, short nReturnCode)
@@ -102,9 +253,9 @@ namespace biostack_module
             PrintResponse(nMessageObject);
             Console.Write("Return Code: ");
             PrintResponse(nReturnCode);
-            byte plateByte = 0;
-            bTIAutoStacker.GetKnownPlatePositions(ref plateByte);
-            Console.WriteLine(plateByte);
+            //byte plateByte = 0;
+            //bTIAutoStacker.GetKnownPlatePositions(ref plateByte);
+            //Console.WriteLine(plateByte);
             Console.WriteLine("---------------");
             state = ModuleStatus.IDLE;
         }
