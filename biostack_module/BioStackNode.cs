@@ -1,6 +1,7 @@
 ﻿using Grapevine;
 using McMaster.Extensions.CommandLineUtils;
-using BTIAUTOSTACKERLib;
+using WEI;
+using static WEI.ModuleHelpers;
 
 namespace biostack_module
 {
@@ -16,266 +17,58 @@ namespace biostack_module
         public int Port { get; } = 2000;
 
         [Option(Description = "Whether or not to simulate the instrument")]
-        public bool Simulate { get; } = false;
+        public bool Simulate { get; } = true;
+
+        [Option(Description = "The COM Port to use when communicating with the BioStack", ShortName = "c")]
+        public short stackerComPort { get; } = 5;
+
 
         public string state = ModuleStatus.INIT;
-        private IRestServer server;
-        private BTIAutoStacker bTIAutoStacker = new BTIAutoStacker();
-        private short stackerComPort = 5;
+        private readonly IRestServer server = RestServerBuilder.UseDefaults().Build();
+        private readonly BioStackDriver biostack_driver;
 
-
-        public void deconstruct()
+        public BioStackNode()
         {
-            Console.WriteLine("Exiting...");
-            server.Stop();
-            if (!Simulate)
-            {
-                bTIAutoStacker.CloseComPort();
-            }
-            Console.WriteLine("Exited...");
+            biostack_driver = new(server);
         }
 
         private void OnExecute()
         {
-            InitializePlateStacker();
-
-            server = RestServerBuilder.UseDefaults().Build();
-            string server_url = "http://" + Hostname + ":" + Port.ToString() + "/";
-            Console.WriteLine(server_url);
-            server.Prefixes.Clear();
-            server.Prefixes.Add(server_url);
-            server.Locals.TryAdd("state", state);
             try
             {
-                //server.Start();
-                Console.WriteLine("Press enter to stop the server");
-                Console.ReadLine();
+                RunServer();
+                biostack_driver.InitializePlateStacker(Simulate, stackerComPort);
+                UpdateModuleStatus(server, ModuleStatus.IDLE);
             }
             catch (Exception ex)
             {
+                // Even if we can't connect to the device, keep the REST Server going
                 Console.WriteLine(ex.ToString());
+                UpdateModuleStatus(server, ModuleStatus.ERROR);
             }
-            finally
+            Console.WriteLine("Press enter to stop the server");
+            Console.ReadLine();
+            deconstruct();
+        }
+        public void deconstruct()
+        {
+            Console.WriteLine("Exiting...");
+            try { server.Stop(); } catch (Exception ex) { Console.Write(ex.ToString()); }
+            // Any Device specific cleanup goes here
+            if (!Simulate)
             {
-                deconstruct();
+                biostack_driver.stacker.CloseComPort();
             }
+            Console.WriteLine("Exited...");
         }
 
-        private void InitializePlateStacker()
+        private void RunServer()
         {
-            if (Simulate)
-            {
-                bTIAutoStacker.EnableSimulation(1);
-            }
-            else
-            {
-                bTIAutoStacker.SetComPort(stackerComPort);
-                bTIAutoStacker.OpenComPort(stackerComPort);
-            }
-            bTIAutoStacker.ActionIsCompleted += StackerActionCompleteHandler;
-            Console.Write("Communications Test (1 means OK): ");
-            Console.WriteLine(bTIAutoStacker.TestCommunicationWithoutDialog());
-            PrintResponse(bTIAutoStacker.IdentifyConfiguredInstrument(0));
-            PrintSystemStatus();
-
-            // Test Actions
-            state = ModuleStatus.BUSY;
-            //Console.Write("Get Known Plate Positions: ");
-            //byte plateByte = 0;
-            //bTIAutoStacker.GetKnownPlatePositions(ref plateByte);
-            //Console.WriteLine(plateByte);
-
-            bTIAutoStacker.BTIAutoCalibrationSupport();
-
-            PrintResponse(bTIAutoStacker.HomeAllAxes());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-
-            PrintResponse(bTIAutoStacker.ClearPlateIDBarcode());
-            Console.WriteLine(bTIAutoStacker.GetLatestBarcodeValue());
-
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.SendNextPlateToCarrier());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.SendPlateToInstrument());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-            Thread.Sleep(5000);
-            Console.WriteLine(bTIAutoStacker.GetLatestBarcodeValue());
-   
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.TransferPlateToOutStack());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.SendPlateToInstrument());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-            Thread.Sleep(5000);
-            Console.WriteLine(bTIAutoStacker.GetLatestBarcodeValue());
-
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.TransferPlateToOutStack());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.SendPlateToInstrument());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-            Thread.Sleep(5000);
-            Console.WriteLine(bTIAutoStacker.GetLatestBarcodeValue());
-
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.TransferPlateToOutStack());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.FastTransferPlateFromOutToIn());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.FastTransferPlateFromOutToIn());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-
-            state = ModuleStatus.BUSY;
-            PrintResponse(bTIAutoStacker.FastTransferPlateFromOutToIn());
-            while (state == ModuleStatus.BUSY)
-            {
-                Thread.Sleep(1000);
-            }
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.SendPlateToInstrument());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.PresentPlateOnCarrier());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.TransferPlateToOutStack());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.SendNextDestPlateToCarrier());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-
-
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.PlateToInputStackFromExtend());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.PlateFromInstrumentToClaw());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.PlateFromClawToInstrument());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.PresentPlateOnCarrier());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-
-            //state = ModuleStatus.BUSY;
-            //PrintResponse(bTIAutoStacker.TransferPlateFromInstrToExtend());
-            //while (state == ModuleStatus.BUSY)
-            //{
-            //    Thread.Sleep(1000);
-            //}
-        }
-
-        private void StackerActionCompleteHandler(short nMessageObject, short nReturnCode)
-        {
-            Console.WriteLine("---------------");
-            Console.WriteLine("ACTION COMPLETE");
-            Console.Write("Message Object: ");
-            PrintResponse(nMessageObject);
-            Console.Write("Return Code: ");
-            PrintResponse(nReturnCode);
-            //byte plateByte = 0;
-            //bTIAutoStacker.GetKnownPlatePositions(ref plateByte);
-            //Console.WriteLine(plateByte);
-            Console.WriteLine("---------------");
-            state = ModuleStatus.IDLE;
-        }
-
-        public void PrintResponse(short response_code)
-        {
-            if (response_code > 1)
-            {
-                Console.WriteLine(response_code.ToString("X4"));
-            }
-            else
-            {
-                Console.WriteLine(response_code.ToString());
-            }
-        }
-
-        public void PrintSystemStatus()
-        {
-            Console.Write("System Status: ");
-            PrintResponse(bTIAutoStacker.GetSystemStatus());
+            server.Prefixes.Clear();
+            server.Prefixes.Add("http://" + Hostname + ":" + Port.ToString() + "/");
+            server.Locals.TryAdd("state", state);
+            server.Locals.TryAdd("biostack_driver", biostack_driver);
+            server.Start();
         }
     }
 }

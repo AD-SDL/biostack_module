@@ -1,26 +1,29 @@
 ﻿using Grapevine;
 using Newtonsoft.Json;
-using System;
-using System.Reflection.Metadata.Ecma335;
+using WEI;
+using static WEI.ModuleHelpers;
 
 namespace biostack_module
 {
+    [RestResource]
     public class BioStackRestServer
     {
 
         private readonly IRestServer _server;
+        private BioStackActions _actions;
         public BioStackRestServer(IRestServer server)
-	    {
+        {
             _server = server;
-	    }
+            _actions = new BioStackActions(_server);
+        }
 
         [RestRoute("Get", "/state")]
         public async Task State(IHttpContext context)
         {
-            string state = _server.Locals.GetAs<string>("state");
+            string state = GetModuleStatus(_server);
             Dictionary<string, string> response = new Dictionary<string, string>
             {
-                ["State"] = state
+                ["State"] = state,
             };
             Console.WriteLine(state);
             await context.Response.SendResponseAsync(JsonConvert.SerializeObject(response));
@@ -32,15 +35,17 @@ namespace biostack_module
             // TODO
             await context.Response.SendResponseAsync(@"
                 {
-                    ""name"":""Epoch2"",
-                    ""model"":""BioTek Epoch2 Plate Reader"",
+                    ""name"":""BioStack"",
+                    ""model"":""BioTek BioStack Automated Plate Stacker"",
                     ""interface"":""wei_rest_node"",
                     ""version"":""0.1.0"",
-                    ""description"":""Module for automating the Epoch 2 platereader."",
+                    ""description"":""Module for automating the BioStack plate stacker."",
                     ""actions"": [
-                        {""name"":""open"",""args"":[],""files"":[]},
-                        {""name"":""close"",""args"":[],""files"":[]},
-                        {""name"":""run_assay"",""args"":[{""name"":""assay_name"",""type"":""str"",""default"":null,""required"":true,""description"":""Name of the assay to run""}],""files"":[]}
+                        {""name"":""send_next_plate"",""args"":[],""files"":[]},
+                        {""name"":""retrieve_plate"",""args"":[],""files"":[]},
+                        {""name"":""restack"",""args"":[],""files"":[]},
+                        {""name"":""send_plate"",""args"":[],""files"":[]},
+                        {""name"":""restack_all"",""args"":[],""files"":[]},
                     ],
                     ""resource_pools"":[]
                 }"
@@ -55,42 +60,40 @@ namespace biostack_module
         }
 
         [RestRoute("Post", "/action")]
+        [RestRoute("Get", "/action")]
         public async Task Action(IHttpContext context)
         {
-            string action_handle = context.Request.QueryString["action_handle"];
-            string action_vars = context.Request.QueryString["action_vars"];
-            Dictionary<string, string> args = JsonConvert.DeserializeObject<Dictionary<string, string>>(action_vars);
-            var result = UtilityFunctions.action_response();
-            string state = _server.Locals.GetAs<string>("state");
-            //HidexSenseAutomationServiceClient client = _server.Locals.GetAs<HidexSenseAutomationServiceClient>("client");
-
-            if (state == ModuleStatus.BUSY)
-            {
-                result = UtilityFunctions.action_response(StepStatus.FAILED, "", "Module is Busy");
-                await context.Response.SendResponseAsync(JsonConvert.SerializeObject(result));
-            }
+            ActionRequest action;
             try
             {
-                _server.Locals.TryUpdate("state", ModuleStatus.BUSY, _server.Locals.GetAs<string>("state"));
-                switch (action_handle)
-                {
-                    case "blah":
-                        break;
-                    default:
-                        Console.WriteLine("Unknown action: " + action_handle);
-                        result = UtilityFunctions.action_response(StepStatus.FAILED, "", "Unknown action: " + action_handle);
-                        break;
-                }
-                _server.Locals.TryUpdate("state", ModuleStatus.IDLE, _server.Locals.GetAs<string>("state"));
+                action = new ActionRequest(context);
             }
             catch (Exception ex)
             {
-                _server.Locals.TryUpdate("state", ModuleStatus.ERROR, _server.Locals.GetAs<string>("state"));
+                // Problem with the request
                 Console.WriteLine(ex.ToString());
-                result = UtilityFunctions.action_response(StepStatus.FAILED, "", "Step failed: " + ex.ToString());
+                await ReturnResult(context, StepFailed($"Problem processing action request: {ex.Message})"));
+                return;
             }
 
-            await context.Response.SendResponseAsync(JsonConvert.SerializeObject(result));
+            try
+            {
+                GetActionLock(_server);
+
+                // Action Definitions for the Module
+                _actions.ActionHandler(ref action);
+
+                ReleaseActionLock(_server);
+            }
+            catch (Exception ex)
+            {
+                // Unhandled exception while executing the action, module should ERROR
+                UpdateModuleStatus(_server, ModuleStatus.ERROR);
+                Console.WriteLine(ex.ToString());
+                action.result = StepFailed("Step failed: " + ex.Message);
+            }
+
+            await action.ReturnResult();
         }
     }
 
