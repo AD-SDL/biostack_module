@@ -46,11 +46,17 @@ namespace WEI
             args = JsonConvert.DeserializeObject<Dictionary<string, object>>(action_vars) ?? new Dictionary<string, object>();
         }
 
+        public ActionRequest(string action_handle, Dictionary<string, object> action_vars)
+        {
+            name = action_handle;
+            args = action_vars;
+        }
+
         public async Task ReturnResult()
         {
             if (action_context is null)
             {
-                throw new Exception("Attempted to return result outside of http context.");
+                throw new Exception("Attempted to return result without http context.");
             }
             await action_context.Response.SendResponseAsync(JsonConvert.SerializeObject(result));
         }
@@ -59,7 +65,7 @@ namespace WEI
         {
             if (action_context is null)
             {
-                throw new Exception("Attempted to return result outside of http context.");
+                throw new Exception("Attempted to return result without http context.");
             }
             await action_context.Response.SendResponseAsync(JsonConvert.SerializeObject(result));
         }
@@ -78,7 +84,7 @@ namespace WEI
             return response;
         }
 
-        public static Dictionary<string, string> StepSucceded(string result = "")
+        public static Dictionary<string, string> StepSucceeded(string result = "")
         {
             return StepResult(action_response: StepStatus.SUCCEEDED, action_msg: result);
         }
@@ -130,6 +136,11 @@ namespace WEI
             {
                 Thread.Sleep(500);
             }
+        }
+
+        public static bool CheckActionSuccess(ref ActionRequest action)
+        {
+            return (action.result["action_response"] == StepStatus.SUCCEEDED);
         }
 
     }

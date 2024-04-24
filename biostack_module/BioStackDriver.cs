@@ -11,6 +11,9 @@ namespace biostack_module
         public BTIAutoStacker stacker = new();
         public bool InProgress = false;
         public short action_return_code = 1;
+        public bool IsCarrierInputOccupied = false;
+        public bool IsCarrierOutputOccupied = false;
+        public bool IsInstrumentOccupied = false;
         public BioStackDriver(IRestServer server)
         {
             this.server = server;
@@ -48,19 +51,29 @@ namespace biostack_module
                     throw new Exception($"Error: tried to Home on initialize due to not OK system status, but failed with error code {FormatResponseCode(action_return_code)}. Current system status is {FormatResponseCode(stacker.GetSystemStatus())}");
                 }
             }
+            UpdateKnownPlatePositions();
             Console.WriteLine("Successfully initialized instrument");
+        }
+
+        public void UpdateKnownPlatePositions()
+        {
+            byte plate_positions = 0;
+            stacker.GetKnownPlatePositions(ref plate_positions);
+            IsCarrierInputOccupied = (plate_positions & 0x01) == 0x01;
+            IsCarrierOutputOccupied = (plate_positions & 0x02) == 0x02;
+            IsInstrumentOccupied = (plate_positions & 0x04) == 0x04;
+            PrintPlatePositions();
         }
 
         public void PrintPlatePositions()
         {
-            byte plate_positions = 0;
+            Console.WriteLine("=====================");
             Console.WriteLine("Plate Positions");
-            Console.WriteLine("===============");
-            Thread.Sleep(500);
-            PrintResponse(stacker.GetKnownPlatePositions(ref plate_positions));
-            Thread.Sleep(500);
-            Console.WriteLine(plate_positions);
-            Console.WriteLine("===============");
+            Console.WriteLine("---------------------");
+            Console.WriteLine($"Carrier Input: {IsCarrierInputOccupied}");
+            Console.WriteLine($"Carrier Output: {IsCarrierOutputOccupied}");
+            Console.WriteLine($"Instrument: {IsInstrumentOccupied}");
+            Console.WriteLine("=====================");
         }
 
         public bool CheckAction()

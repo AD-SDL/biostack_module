@@ -30,7 +30,7 @@ namespace biostack_module
                 return;
             }
             UpdateModuleStatus(_server, ModuleStatus.IDLE);
-            await ReturnResult(context, StepSucceded("Reset complete"));
+            await ReturnResult(context, StepSucceeded("Reset complete"));
         }
 
         [RestRoute("Post", "/admin/home")]
@@ -46,7 +46,7 @@ namespace biostack_module
                 return;
             }
             UpdateModuleStatus(_server, ModuleStatus.IDLE);
-            await ReturnResult(context, StepSucceded("Reset complete"));
+            await ReturnResult(context, StepSucceeded("Reset complete"));
         }
 
         [RestRoute("Get", "/state")]
