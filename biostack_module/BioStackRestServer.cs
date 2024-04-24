@@ -17,6 +17,38 @@ namespace biostack_module
             _actions = new BioStackActions(_server);
         }
 
+        [RestRoute("Post", "/admin/reset")]
+        public async Task AdminReset(IHttpContext context)
+        {
+            var biostack_driver = _server.Locals.GetAs<BioStackDriver>("biostack_driver");
+            biostack_driver.InProgress = true;
+            biostack_driver.PrintResponse(biostack_driver.stacker.ResetStacker());
+            if(!biostack_driver.CheckAction())
+            {
+                UpdateModuleStatus(_server, ModuleStatus.ERROR);
+                await ReturnResult(context, StepFailed($"Failed resetting biostack, error: {biostack_driver.FormatResponseCode(biostack_driver.action_return_code)}"));
+                return;
+            }
+            UpdateModuleStatus(_server, ModuleStatus.IDLE);
+            await ReturnResult(context, StepSucceded("Reset complete"));
+        }
+
+        [RestRoute("Post", "/admin/home")]
+        public async Task AdminHome(IHttpContext context)
+        {
+            var biostack_driver = _server.Locals.GetAs<BioStackDriver>("biostack_driver");
+            biostack_driver.InProgress = true;
+            biostack_driver.PrintResponse(biostack_driver.stacker.HomeAllAxes());
+            if (!biostack_driver.CheckAction())
+            {
+                UpdateModuleStatus(_server, ModuleStatus.ERROR);
+                await ReturnResult(context, StepFailed($"Failed homing biostack, error: {biostack_driver.FormatResponseCode(biostack_driver.action_return_code)}"));
+                return;
+            }
+            UpdateModuleStatus(_server, ModuleStatus.IDLE);
+            await ReturnResult(context, StepSucceded("Reset complete"));
+        }
+
         [RestRoute("Get", "/state")]
         public async Task State(IHttpContext context)
         {
@@ -32,8 +64,7 @@ namespace biostack_module
         [RestRoute("Get", "/about")]
         public async Task About(IHttpContext context)
         {
-            // TODO
-            await context.Response.SendResponseAsync(@"
+            await context.Response.SendResponseAsync((JsonConvert.DeserializeObject(@"
                 {
                     ""name"":""BioStack"",
                     ""model"":""BioTek BioStack Automated Plate Stacker"",
@@ -44,11 +75,11 @@ namespace biostack_module
                         {""name"":""send_next_plate"",""args"":[],""files"":[]},
                         {""name"":""retrieve_plate"",""args"":[],""files"":[]},
                         {""name"":""restack"",""args"":[],""files"":[]},
-                        {""name"":""send_plate"",""args"":[],""files"":[]},
-                        {""name"":""restack_all"",""args"":[],""files"":[]},
+                        //{""name"":""send_plate"",""args"":[],""files"":[]},
+                        //{""name"":""restack_all"",""args"":[],""files"":[]},
                     ],
                     ""resource_pools"":[]
-                }"
+                }") ?? throw new Exception("Invalid About definition")).ToString()
             );
         }
 
@@ -60,7 +91,6 @@ namespace biostack_module
         }
 
         [RestRoute("Post", "/action")]
-        [RestRoute("Get", "/action")]
         public async Task Action(IHttpContext context)
         {
             ActionRequest action;

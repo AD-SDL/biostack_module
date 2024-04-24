@@ -17,7 +17,7 @@ namespace biostack_module
         public int Port { get; } = 2000;
 
         [Option(Description = "Whether or not to simulate the instrument")]
-        public bool Simulate { get; } = true;
+        public bool Simulate { get; } = false;
 
         [Option(Description = "The COM Port to use when communicating with the BioStack", ShortName = "c")]
         public short stackerComPort { get; } = 5;

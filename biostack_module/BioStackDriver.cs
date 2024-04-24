@@ -19,8 +19,10 @@ namespace biostack_module
 
         public void InitializePlateStacker(bool simulate, short stackerComPort)
         {
+            Console.WriteLine("Initializing Device");
             if (simulate)
             {
+                Console.WriteLine("Note: Simulation Mode Enabled, no commands will actually be sent to device");
                 stacker.EnableSimulation(1);
             }
             else
@@ -31,13 +33,39 @@ namespace biostack_module
             stacker.ActionIsCompleted += StackerActionCompleteHandler;
             Console.Write("Communications Test (1 means OK): ");
             Console.WriteLine(stacker.TestCommunicationWithoutDialog());
+            Console.Write("Identifying Configured Insrument: ");
             PrintResponse(stacker.IdentifyConfiguredInstrument(0));
             PrintSystemStatus();
+
+            var system_status = stacker.GetSystemStatus();
+            if (system_status != 1)
+            {
+                Console.WriteLine($"System Status is not OK, trying to home...");
+                InProgress = true;
+                stacker.HomeAllAxes();
+                if (!CheckAction())
+                {
+                    throw new Exception($"Error: tried to Home on initialize due to not OK system status, but failed with error code {FormatResponseCode(action_return_code)}. Current system status is {FormatResponseCode(stacker.GetSystemStatus())}");
+                }
+            }
+            Console.WriteLine("Successfully initialized instrument");
+        }
+
+        public void PrintPlatePositions()
+        {
+            byte plate_positions = 0;
+            Console.WriteLine("Plate Positions");
+            Console.WriteLine("===============");
+            Thread.Sleep(500);
+            PrintResponse(stacker.GetKnownPlatePositions(ref plate_positions));
+            Thread.Sleep(500);
+            Console.WriteLine(plate_positions);
+            Console.WriteLine("===============");
         }
 
         public bool CheckAction()
         {
-            int timeoutInSeconds = 60;
+            int timeoutInSeconds = 30;
             int elapsedTimeInSeconds = 0;
             DateTime startTime = DateTime.Now;
 
@@ -67,16 +95,21 @@ namespace biostack_module
             InProgress = false;
         }
 
-        public void PrintResponse(short response_code)
+        public string FormatResponseCode(short response_code)
         {
             if (response_code > 1)
             {
-                Console.WriteLine(response_code.ToString("X4"));
+                return response_code.ToString("X4");
             }
             else
             {
-                Console.WriteLine(response_code.ToString());
+                return response_code.ToString();
             }
+        }
+
+        public void PrintResponse(short response_code)
+        {
+            Console.WriteLine(FormatResponseCode(response_code));
         }
 
         public void PrintSystemStatus()
